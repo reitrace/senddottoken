@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { encodeFunctionData, parseUnits } from 'viem'
 import { useAppKitProvider, type Provider, useAppKitAccount } from '@reown/appkit/react-core'
 import { multisenderAddress } from '@/config'
+import { Spinner } from './Spinner'
+import { Toast } from './Toast'
 
 const abi = [
   {
@@ -46,6 +48,7 @@ export const MultiSenderForm = () => {
   const [selectedSymbol, setSelectedSymbol] = useState(tokenList[0].symbol)
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
   const MAX_RETRIES = 15
 
   const selectedToken = tokenList.find(t => t.symbol === selectedSymbol)!
@@ -82,6 +85,7 @@ export const MultiSenderForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setLoading(true)
     setStatus(null)
     setError(null)
 
@@ -155,7 +159,13 @@ export const MultiSenderForm = () => {
       }
       setStatus(`Transaction confirmed: https://etherscan.io/tx/${truncated}`)
     } catch (err: unknown) {
-      setError((err as Error).message || 'Transaction failed')
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError('Transaction failed')
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -190,9 +200,11 @@ export const MultiSenderForm = () => {
           style={{ width: '300px', height: '100px' }}
         />
       </div>
-      <button type="submit">Submit</button>
-      {status && <p style={{ color: 'green' }}>{status}</p>}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      <button type="submit" disabled={loading}>
+        {loading ? <Spinner /> : 'Submit'}
+      </button>
+      <Toast message={status} type="success" onClose={() => setStatus(null)} />
+      <Toast message={error} type="error" onClose={() => setError(null)} />
     </form>
   )
 }
