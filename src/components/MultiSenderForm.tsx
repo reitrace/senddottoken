@@ -8,6 +8,7 @@ import { Spinner } from "./Spinner";
 import { Toast } from "./Toast";
 import { useClientMounted } from "@/hooks/useClientMount";
 import { useSendTransaction, useBalance } from "wagmi";
+import { resolveRecipient } from "@/utils/lensAccounts";
 import { readContract, waitForTransactionReceipt } from "wagmi/actions";
 
 const abi = [
@@ -162,19 +163,26 @@ export const MultiSenderForm = () => {
 
     const recips: Address[] = [];
     const values: bigint[] = [];
-    entries
+    const lines = entries
       .split("\n")
       .map((l) => l.trim())
-      .filter(Boolean)
-      .forEach((line) => {
-        const [r, a] = line.split(",");
-        if (r && a) {
-          recips.push(r.trim() as Address);
+      .filter(Boolean);
+    for (const line of lines) {
+      const [r, a] = line.split(",");
+      if (r && a) {
+        try {
+          const resolved = await resolveRecipient(r.trim());
+          recips.push(resolved as Address);
           values.push(
             parseUnits(a.trim() as `${number}`, selectedToken.decimals)
           );
+        } catch {
+          setError(`Invalid recipient: ${r.trim()}`);
+          setLoading(false);
+          return;
         }
-      });
+      }
+    }
 
     if (recips.length === 0) {
       setError("No valid entries");
