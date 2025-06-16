@@ -435,3 +435,39 @@ html.dark .seg-btn:not(.active):hover {
     margin-top: 32px;
   }
 }
+
+/* ---------- Recipient cards ---------- */
+.recipient-card {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;          /* allows graceful wrapping on small screens */
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--header-border);
+  border-radius: 8px;
+  background: var(--card-bg);
+}
+
+.recipient-input {
+  flex: 1 1 240px;          /* grow/shrink, min width */
+  min-width: 160px;
+}
+
+.amount-input {
+  width: 110px;             /* keep it narrow but readable */
+}
+
+/* Error button variant */
+.btn-error {
+  background: var(--error);
+  color: #fff;
+}
+.btn-error:hover:not(:disabled) {
+  background: #cc2b24;      /* slightly darker on hover */
+}
+.btn-error:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
