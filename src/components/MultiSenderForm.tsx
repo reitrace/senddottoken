@@ -73,36 +73,30 @@ interface CardProps {
 
 /* ---------- Sub-component ---------- */
 const RecipientCard = ({ index, entry, onChange, onRemove }: CardProps) => (
-  <div className="card recipient-card" style={{ marginBottom: 12 }}>
-    <div className="field-row">
-      <label>Address</label>
-      <input
-        className="input"
-        value={entry.recipient}
-        placeholder="0x… or Lens handle"
-        onChange={(e) => onChange(index, "recipient", e.target.value)}
-      />
-    </div>
+  <div className="card recipient-card">
+    <input
+      className="input recipient-input"
+      value={entry.recipient}
+      placeholder="0x… or Lens handle"
+      onChange={(e) => onChange(index, "recipient", e.target.value)}
+    />
 
-    <div className="field-row" style={{ marginTop: 8 }}>
-      <label>Amount</label>
-      <input
-        className="input"
-        type="number"
-        min="0"
-        step="any"
-        value={entry.amount}
-        onChange={(e) => onChange(index, "amount", e.target.value)}
-      />
-    </div>
+    <input
+      className="input amount-input"
+      type="number"
+      min="0"
+      step="any"
+      value={entry.amount}
+      placeholder="Amount"
+      onChange={(e) => onChange(index, "amount", e.target.value)}
+    />
 
     <button
       type="button"
-      className="btn btn-error"
-      style={{ marginTop: 8 }}
+      className="btn btn-error btn-sm"
       onClick={() => onRemove(index)}
     >
-      Remove
+      ✕
     </button>
   </div>
 );
@@ -118,7 +112,7 @@ export const MultiSenderForm = () => {
   /* ----- State ----- */
   const [rows, setRows] = useState<Entry[]>([{ recipient: "", amount: "" }]);
   const [selectedSymbol, setSelectedSymbol] = useState<TokenSymbol>(
-    tokenList[0].symbol
+    tokenList[0].symbol,
   );
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -130,9 +124,7 @@ export const MultiSenderForm = () => {
   const selectedToken = tokenList.find((t) => t.symbol === selectedSymbol)!;
 
   /* ----- Wagmi hooks ----- */
-  const { data: nativeBalance } = useBalance({
-    address: address as Address,
-  });
+  const { data: nativeBalance } = useBalance({ address: address as Address });
   const { data: tokenBalance } = useBalance({
     address: address as Address,
     token: selectedToken.address as Address,
@@ -150,7 +142,7 @@ export const MultiSenderForm = () => {
         try {
           total += parseUnits(amount, selectedToken.decimals);
         } catch {
-          /* ignore invalid amounts */
+          /* ignore */
         }
       }
     });
@@ -183,7 +175,7 @@ export const MultiSenderForm = () => {
     ).toLocaleString(undefined, { maximumFractionDigits: 6 })} $${selectedSymbol}`;
   }, [summary.total, selectedToken.decimals, selectedSymbol]);
 
-  /* ----- Handlers ----- */
+  /* ----- CSV upload ----- */
   const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -200,22 +192,17 @@ export const MultiSenderForm = () => {
         .forEach((line) => {
           const [recipient, amount] = line.split(",");
           if (recipient && amount) {
-            newRows.push({
-              recipient: recipient.trim(),
-              amount: amount.trim(),
-            });
+            newRows.push({ recipient: recipient.trim(), amount: amount.trim() });
           }
         });
 
-      if (newRows.length) {
-        setRows((r) => [...r, ...newRows]);
-      } else {
-        setError("No valid rows found in CSV");
-      }
+      if (newRows.length) setRows((r) => [...r, ...newRows]);
+      else setError("No valid rows found in CSV");
     };
     reader.readAsText(file);
   };
 
+  /* ----- Submit handler (unchanged) ----- */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -279,7 +266,7 @@ export const MultiSenderForm = () => {
     }
 
     try {
-      /* ----- Handle ERC-20 allowance if needed ----- */
+      /* Allowance logic … (unchanged) */
       if (selectedToken.address) {
         const allowance = await readContract(config, {
           abi: erc20Abi,
@@ -299,13 +286,13 @@ export const MultiSenderForm = () => {
             account: address as Address,
           });
           setStatus(
-            `Approval tx sent: https://explorer.lens.xyz/tx/${approveHash}`
+            `Approval tx sent: https://explorer.lens.xyz/tx/${approveHash}`,
           );
           await waitForTransactionReceipt(config, { hash: approveHash });
         }
       }
 
-      /* ----- Prepare multisend tx ----- */
+      /* Main multisend */ /* … unchanged … */
       let data: `0x${string}`;
       if (selectedToken.address) {
         data = encodeFunctionData({
@@ -377,7 +364,9 @@ export const MultiSenderForm = () => {
           entry={entry}
           onChange={(idx, field, val) =>
             setRows((r) =>
-              r.map((row, j) => (idx === j ? { ...row, [field]: val } : row))
+              r.map((row, j) =>
+                idx === j ? { ...row, [field]: val } : row,
+              ),
             )
           }
           onRemove={(idx) => setRows((r) => r.filter((_, j) => j !== idx))}
@@ -386,23 +375,24 @@ export const MultiSenderForm = () => {
 
       <button
         type="button"
-        className="btn"
+        className="btn btn-outline btn-sm"
         onClick={() => setRows((r) => [...r, { recipient: "", amount: "" }])}
+        style={{ marginBottom: 12 }}
       >
         + Add recipient
       </button>
 
-      {/* Optional CSV upload */}
+      {/* CSV upload */}
       <input
         type="file"
         accept=".csv,text/csv"
         className="file-input"
-        style={{ marginTop: 12 }}
         onChange={handleCsvUpload}
+        style={{ marginBottom: 12 }}
       />
 
       {/* 3. Totals */}
-      <div className="total-line" style={{ marginTop: 12 }}>
+      <div className="total-line">
         <span>Total recipients: {summary.count}</span>
         <span>Total amount: {prettyTotal}</span>
       </div>
