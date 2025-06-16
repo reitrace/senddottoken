@@ -1,7 +1,8 @@
+// MultiSenderForm.tsx
 "use client";
 
-import { useState, useMemo, ChangeEvent, FormEvent } from "react";
-import { encodeFunctionData, parseUnits, isAddress, type Address } from "viem";
+import { useState, useMemo } from "react";
+import { encodeFunctionData, parseUnits, type Address } from "viem";
 import { useAppKitAccount } from "@reown/appkit/react-core";
 import { multisenderAddress, config } from "@/config";
 import { Spinner } from "./Spinner";
@@ -12,11 +13,8 @@ import { resolveRecipient } from "@/utils/lensAccounts";
 import { readContract, waitForTransactionReceipt } from "wagmi/actions";
 import { tokenList, TokenSymbol } from "@/constants/tokens";
 
-/* ------------------------------------------------------------------ */
-/*                               ABIs                                 */
-/* ------------------------------------------------------------------ */
-
-const multisenderAbi = [
+/* ---------- ABIs ---------- */
+const abi = [
   {
     name: "disperseEther",
     type: "function",
@@ -63,17 +61,8 @@ const erc20Abi = [
   },
 ] as const;
 
-/* ------------------------------------------------------------------ */
-/*                          Helper types                              */
-/* ------------------------------------------------------------------ */
-
+/* ---------- Types ---------- */
 type Entry = { recipient: string; amount: string };
-
-const tipRecipient = process.env.NEXT_PUBLIC_TIP_RECIPIENT;
-
-/* ------------------------------------------------------------------ */
-/*                      Recipient card component                      */
-/* ------------------------------------------------------------------ */
 
 interface CardProps {
   index: number;
@@ -82,6 +71,7 @@ interface CardProps {
   onRemove: (i: number) => void;
 }
 
+/* ---------- Sub-component ---------- */
 const RecipientCard = ({ index, entry, onChange, onRemove }: CardProps) => (
   <div className="card recipient-card" style={{ marginBottom: 12 }}>
     <div className="field-row">
@@ -89,16 +79,12 @@ const RecipientCard = ({ index, entry, onChange, onRemove }: CardProps) => (
       <input
         className="input"
         value={entry.recipient}
-        onChange={(e) => onChange(index, "recipient", e.target.value)}
         placeholder="0x… or Lens handle"
-        style={{
-          borderColor:
-            entry.recipient && !isAddress(entry.recipient) ? "red" : undefined,
-        }}
+        onChange={(e) => onChange(index, "recipient", e.target.value)}
       />
     </div>
 
-    <div className="field-row" style={{ marginTop: 6 }}>
+    <div className="field-row" style={{ marginTop: 8 }}>
       <label>Amount</label>
       <input
         className="input"
@@ -113,7 +99,7 @@ const RecipientCard = ({ index, entry, onChange, onRemove }: CardProps) => (
     <button
       type="button"
       className="btn btn-error"
-      style={{ marginTop: 6 }}
+      style={{ marginTop: 8 }}
       onClick={() => onRemove(index)}
     >
       Remove
@@ -121,19 +107,18 @@ const RecipientCard = ({ index, entry, onChange, onRemove }: CardProps) => (
   </div>
 );
 
-/* ------------------------------------------------------------------ */
-/*                       Main form component                          */
-/* ------------------------------------------------------------------ */
+/* ---------- Env ---------- */
+const tipRecipient = process.env.NEXT_PUBLIC_TIP_RECIPIENT;
 
+/* ---------- Main component ---------- */
 export const MultiSenderForm = () => {
   const { address, isConnected } = useAppKitAccount();
   const mounted = useClientMounted();
 
-  /* ----------------------------- State ---------------------------- */
-
+  /* ----- State ----- */
   const [rows, setRows] = useState<Entry[]>([{ recipient: "", amount: "" }]);
   const [selectedSymbol, setSelectedSymbol] = useState<TokenSymbol>(
-    tokenList[0].symbol,
+    tokenList[0].symbol
   );
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -141,12 +126,10 @@ export const MultiSenderForm = () => {
   const [txLink, setTxLink] = useState<string | null>(null);
   const [tipAmount, setTipAmount] = useState("");
 
-  /* ------------------------ Token selection ----------------------- */
-
+  /* ----- Token selection ----- */
   const selectedToken = tokenList.find((t) => t.symbol === selectedSymbol)!;
 
-  /* ------------------------ Balances (wagmi) ---------------------- */
-
+  /* ----- Wagmi hooks ----- */
   const { data: nativeBalance } = useBalance({
     address: address as Address,
   });
@@ -154,13 +137,9 @@ export const MultiSenderForm = () => {
     address: address as Address,
     token: selectedToken.address as Address,
   });
-
-  /* ----------------------- Send transaction ----------------------- */
-
   const { sendTransactionAsync } = useSendTransaction();
 
-  /* --------------------------- Summary ---------------------------- */
-
+  /* ----- Summary ----- */
   const summary = useMemo(() => {
     let count = 0;
     let total = 0n;
@@ -176,7 +155,6 @@ export const MultiSenderForm = () => {
       }
     });
 
-    // Tip?
     if (
       tipRecipient &&
       tipAmount &&
@@ -202,14 +180,11 @@ export const MultiSenderForm = () => {
     return `${(
       Number(summary.total) /
       10 ** selectedToken.decimals
-    ).toLocaleString(undefined, {
-      maximumFractionDigits: 6,
-    })} $${selectedSymbol}`;
+    ).toLocaleString(undefined, { maximumFractionDigits: 6 })} $${selectedSymbol}`;
   }, [summary.total, selectedToken.decimals, selectedSymbol]);
 
-  /* ----------------------- CSV upload handler --------------------- */
-
-  const handleCsvUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  /* ----- Handlers ----- */
+  const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -235,25 +210,18 @@ export const MultiSenderForm = () => {
       if (newRows.length) {
         setRows((r) => [...r, ...newRows]);
       } else {
-        setStatus(null);
         setError("No valid rows found in CSV");
       }
     };
     reader.readAsText(file);
-    // reset the file input so the same file can be re-uploaded if needed
-    e.target.value = "";
   };
 
-  /* --------------------------- Submit ----------------------------- */
-
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setStatus(null);
     setError(null);
     setTxLink(null);
-
-    /* ---- basic checks ---- */
 
     if (!isConnected || !address) {
       setError("Wallet not connected");
@@ -266,8 +234,6 @@ export const MultiSenderForm = () => {
       return;
     }
 
-    /* ---- parse rows ---- */
-
     const recips: Address[] = [];
     const values: bigint[] = [];
 
@@ -276,9 +242,7 @@ export const MultiSenderForm = () => {
         try {
           const resolved = await resolveRecipient(recipient.trim());
           recips.push(resolved as Address);
-          values.push(
-            parseUnits(amount.trim() as `${number}`, selectedToken.decimals),
-          );
+          values.push(parseUnits(amount.trim(), selectedToken.decimals));
         } catch {
           setError(`Invalid recipient: ${recipient.trim()}`);
           setLoading(false);
@@ -286,8 +250,6 @@ export const MultiSenderForm = () => {
         }
       }
     }
-
-    /* ---- optional tip ---- */
 
     if (
       tipRecipient &&
@@ -309,8 +271,6 @@ export const MultiSenderForm = () => {
       return;
     }
 
-    /* ---- balance check ---- */
-
     const total = values.reduce((s, v) => s + v, 0n);
     if (userBalance < total) {
       setError("Insufficient balance");
@@ -318,9 +278,8 @@ export const MultiSenderForm = () => {
       return;
     }
 
-    /* ---- approve (if ERC-20) ---- */
-
     try {
+      /* ----- Handle ERC-20 allowance if needed ----- */
       if (selectedToken.address) {
         const allowance = await readContract(config, {
           abi: erc20Abi,
@@ -328,45 +287,39 @@ export const MultiSenderForm = () => {
           functionName: "allowance",
           args: [address as Address, multisenderAddress as Address],
         });
-
         if (allowance < total) {
           const approveData = encodeFunctionData({
             abi: erc20Abi,
             functionName: "approve",
             args: [multisenderAddress as Address, total],
           });
-
           const approveHash = await sendTransactionAsync({
             to: selectedToken.address as Address,
             data: approveData,
             account: address as Address,
           });
-
           setStatus(
-            `Approval tx sent: https://explorer.lens.xyz/tx/${approveHash}`,
+            `Approval tx sent: https://explorer.lens.xyz/tx/${approveHash}`
           );
           await waitForTransactionReceipt(config, { hash: approveHash });
         }
       }
 
-      /* ---- build multisend calldata ---- */
-
+      /* ----- Prepare multisend tx ----- */
       let data: `0x${string}`;
       if (selectedToken.address) {
         data = encodeFunctionData({
-          abi: multisenderAbi,
+          abi,
           functionName: "disperseToken",
           args: [selectedToken.address as Address, recips, values],
         });
       } else {
         data = encodeFunctionData({
-          abi: multisenderAbi,
+          abi,
           functionName: "disperseEther",
           args: [recips, values],
         });
       }
-
-      /* ---- send ---- */
 
       const hash = await sendTransactionAsync({
         to: multisenderAddress as Address,
@@ -374,28 +327,23 @@ export const MultiSenderForm = () => {
         value: selectedToken.address ? undefined : total,
         account: address as Address,
       });
-
       const url = `https://explorer.lens.xyz/tx/${hash}`;
       setTxLink(url);
       setStatus(`Transaction sent: ${url}`);
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Transaction failed");
-      }
+      if (err instanceof Error) setError(err.message);
+      else setError("Transaction failed");
     } finally {
       setLoading(false);
     }
   };
 
-  /* -------------------------- Rendering --------------------------- */
-
+  /* ---------- UI ---------- */
   if (!mounted) return null;
 
   return (
     <form onSubmit={handleSubmit} className="card field">
-      {/* === 1. Token selector === */}
+      {/* 1. Token selector */}
       <div className="field-row">
         <label htmlFor="token">Token</label>
         <select
@@ -415,14 +363,13 @@ export const MultiSenderForm = () => {
             Balance:{" "}
             {selectedToken.address
               ? tokenBalance?.formatted
-              : nativeBalance?.formatted}
-            {" $"}
-            {selectedSymbol}
+              : nativeBalance?.formatted}{" "}
+            ${selectedSymbol}
           </span>
         )}
       </div>
 
-      {/* === 2. Recipient cards === */}
+      {/* 2. Recipient cards */}
       {rows.map((entry, i) => (
         <RecipientCard
           key={i}
@@ -430,12 +377,10 @@ export const MultiSenderForm = () => {
           entry={entry}
           onChange={(idx, field, val) =>
             setRows((r) =>
-              r.map((row, j) => (idx === j ? { ...row, [field]: val } : row)),
+              r.map((row, j) => (idx === j ? { ...row, [field]: val } : row))
             )
           }
-          onRemove={(idx) =>
-            setRows((r) => r.filter((_, j) => j !== idx || r.length === 1))
-          }
+          onRemove={(idx) => setRows((r) => r.filter((_, j) => j !== idx))}
         />
       ))}
 
@@ -443,27 +388,26 @@ export const MultiSenderForm = () => {
         type="button"
         className="btn"
         onClick={() => setRows((r) => [...r, { recipient: "", amount: "" }])}
-        style={{ marginBottom: 12 }}
       >
         + Add recipient
       </button>
 
-      {/* === 3. CSV upload === */}
+      {/* Optional CSV upload */}
       <input
         type="file"
         accept=".csv,text/csv"
-        onChange={handleCsvUpload}
         className="file-input"
-        style={{ marginBottom: 12 }}
+        style={{ marginTop: 12 }}
+        onChange={handleCsvUpload}
       />
 
-      {/* === 4. Totals === */}
-      <div className="total-line" style={{ marginBottom: 12 }}>
+      {/* 3. Totals */}
+      <div className="total-line" style={{ marginTop: 12 }}>
         <span>Total recipients: {summary.count}</span>
         <span>Total amount: {prettyTotal}</span>
       </div>
 
-      {/* === 5. Optional tip === */}
+      {/* 4. Optional tip */}
       {tipRecipient && (
         <div className="field-row" style={{ marginTop: 8 }}>
           <label htmlFor="tip-amount">
@@ -482,7 +426,7 @@ export const MultiSenderForm = () => {
         </div>
       )}
 
-      {/* === 6. Primary action === */}
+      {/* 5. Primary action */}
       <button
         className="btn btn-primary btn-lg"
         type="submit"
@@ -492,7 +436,7 @@ export const MultiSenderForm = () => {
         {loading ? <Spinner /> : "Send"}
       </button>
 
-      {/* === 7. Feedback === */}
+      {/* 6. Feedback */}
       {status && (
         <Toast
           message={status}
